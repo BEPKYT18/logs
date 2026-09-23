@@ -1,4 +1,6 @@
 #include <fstream>
+#include <sstream>
+
 
 //структуры
 struct Date{
@@ -22,7 +24,7 @@ struct Consts{
 };
 
 struct Log{
-    Date D;
+    std::string date;
     std::string name;
     std::string command;
     size_t code;
@@ -94,3 +96,17 @@ void log_dateToDate(size_t& log_date, Date& D, const Consts& C,  size_t* monthes
     SecToMinute(log_date, D, C);
     SecToSecond(log_date, D, C);
 }
+
+std::string DateToStr(const Date& D){
+    std::string monthes[]={"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    std::string date;
+    std::stringstream ss(date);
+    ss<<D.year<<", "<<monthes[D.month-1]<<' '<<D.day<<", "<<D.hour<<':'<<D.minute<<':'<<D.second;
+    return date;
+}
+
+void MakeLog(const Date& D, Log& L,const std::string& name, const std::string& command,const size_t& code){
+    L={DateToStr(D), name, command, code};
+}
+
+//
