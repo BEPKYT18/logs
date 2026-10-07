@@ -1,14 +1,14 @@
-#include <iostream>
-#include <ctime>
 #include "funcs.cpp"
 
 int main(){
+    
     std::string names [] = {"user", "zhorik", "bobik"};
     std::string commands [] = {"/start", "/end"};
     size_t codes [] = {200, 404, 500};
-    srand(time(0));
-    std::ofstream fout("system_logs.txt");
+    std::ofstream fout("system_logs.txt", std::ios::out | std::ios::app);
     Consts C;
-    int64_t log_date=C.Y2000 + rand() % C.NOW;
-
+    Date D;
+    size_t count=1;
+    WriteLog(fout,count,D,names,commands,codes,C);
+    //std::cout<<names[randint64_t(0, sizeof(names)/sizeof(names[0])-1)];
 }

@@ -1,5 +1,8 @@
 #include <fstream>
 #include <sstream>
+#include <iostream>
+#include <random>
+#include <chrono>
 
 
 //структуры
@@ -15,7 +18,7 @@ struct Date{
 struct Consts{
     int64_t Y2000 = 63115200000;
     int64_t FOURYEARS = 126230400;
-    int64_t NOW = 820454400;
+    int64_t NOW = 820454400;//26 years
     int64_t YEAR = 31536000;
     int64_t DAYS28 = 2419200;
     size_t DAY = 86400;
@@ -23,25 +26,34 @@ struct Consts{
     size_t MINUTE = 60;
 };
 
-struct Log{
-    std::string date;
-    std::string name;
-    std::string command;
-    size_t code;
-};
+int64_t randint64_t(const int64_t& min,const int64_t& max){
+    std::random_device rd;
+    std::seed_seq seed{
+        rd(), rd(), rd(), rd(),
+        static_cast<unsigned>(
+            std::chrono::high_resolution_clock::now()
+                .time_since_epoch().count())
+    };
+    std::mt19937 gen(seed);
+    std::uniform_int_distribution<int64_t> dist(min, max);
+
+    return dist(gen);
+}
 
 
 //перевод в логи
-void SecToYear(const size_t& log_date, Date& D, const Consts& C){
-    D.year=log_date/C.FOURYEARS*4 + (log_date%C.FOURYEARS)/C.YEAR;
+void SecToYear(int64_t& log_date, Date& D, const Consts& C){
+    D.year=(log_date/C.FOURYEARS)*4 + (log_date%C.FOURYEARS)/C.YEAR;
+    log_date=(log_date%C.FOURYEARS)%C.YEAR;
 }
 
-void SecToMonth(size_t& log_date, Date& D, const Consts& C, size_t* monthes){
-    log_date%=D.year;
-    if(D.year%4==3){//високосный год
+void SecToMonth(int64_t& log_date, Date& D, const Consts& C){
+    size_t monthes[]={2678400, 2419200, 2678400, 2592000, 2678400, 2592000, 2678400, 2678400, 2592000, 2678400, 2592000, 2678400};
+    D.month=1;
+    if(D.year%4==0){//високосный год
         monthes[1] = C.DAYS28+C.DAY;
-        D.month=1;
-        while(log_date>=C.DAYS28+C.DAY){
+        
+        while(log_date>=monthes[D.month-1]){
             log_date-=monthes[D.month-1];
             ++D.month;
         }
@@ -49,15 +61,14 @@ void SecToMonth(size_t& log_date, Date& D, const Consts& C, size_t* monthes){
     }
     else{
         monthes[1] = C.DAYS28;
-        while(log_date>=C.DAYS28){
+        while(log_date>=monthes[D.month-1]){
             log_date-=monthes[D.month-1];
             ++D.month;
         }
     }
 }
 
-void SecToDay(size_t& log_date, Date& D, const Consts& C){
-    log_date%=D.month;
+void SecToDay(int64_t& log_date, Date& D, const Consts& C){
     D.day=1;
     while(log_date>=C.DAY){
         log_date-=C.DAY;
@@ -65,8 +76,7 @@ void SecToDay(size_t& log_date, Date& D, const Consts& C){
     }
 }
 
-void SecToHour(size_t& log_date, Date& D, const Consts& C){
-    log_date%=D.day;
+void SecToHour(int64_t& log_date, Date& D, const Consts& C){
     D.hour=0;
     while(log_date>=C.HOUR){
         log_date-=C.HOUR;
@@ -74,39 +84,39 @@ void SecToHour(size_t& log_date, Date& D, const Consts& C){
     }
 }
 
-void SecToMinute(size_t& log_date, Date& D, const Consts& C){
-    log_date%=D.hour;
+void SecToMinuteAndSec(int64_t& log_date, Date& D, const Consts& C){
     D.minute=0;
     while(log_date>=C.MINUTE){
         log_date-=C.MINUTE;
         ++D.minute;
     }
-}
-
-void SecToSecond(size_t& log_date, Date& D, const Consts& C){
-    log_date%=D.minute;
     D.second=log_date;
 }
 
-void log_dateToDate(size_t& log_date, Date& D, const Consts& C,  size_t* monthes){
+
+void log_dateToDate(int64_t& log_date, Date& D, const Consts& C){
     SecToYear(log_date, D, C);
-    SecToMonth(log_date, D, C, monthes);
+    SecToMonth(log_date, D, C);
     SecToDay(log_date, D, C);
     SecToHour(log_date, D, C);
-    SecToMinute(log_date, D, C);
-    SecToSecond(log_date, D, C);
+    SecToMinuteAndSec(log_date, D, C);
 }
 
-std::string DateToStr(const Date& D){
+std::string MakeLog(const Date& D, const std::string& name, const std::string& command, const size_t& code){
     std::string monthes[]={"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-    std::string date;
-    std::stringstream ss(date);
-    ss<<D.year<<", "<<monthes[D.month-1]<<' '<<D.day<<", "<<D.hour<<':'<<D.minute<<':'<<D.second;
-    return date;
+    std::ostringstream oss;
+    oss<<D.year<<", "<<monthes[D.month-1]<<' '<<D.day<<", "<<D.hour<<':'<<D.minute<<':'<<D.second<<' '<<name<<' '<<command<<' '<<code;
+    return oss.str();
 }
 
-void MakeLog(const Date& D, Log& L,const std::string& name, const std::string& command,const size_t& code){
-    L={DateToStr(D), name, command, code};
-}
+//запись в файл
 
-//
+void WriteLog(std::ofstream& fout,const size_t& count, Date& D,
+    const std::string* names, const std::string* commands, const size_t* codes, const Consts& C){ 
+    for(int i=0;i<count;++i){
+        int64_t log_date=randint64_t(C.Y2000, C.Y2000+C.NOW);
+        log_dateToDate(log_date, D, C);
+        std::string log = MakeLog(D, names[randint64_t(0, sizeof(names)/sizeof(names[0]))], commands[randint64_t(0, sizeof(commands)/sizeof(commands[0]))], codes[randint64_t(0, sizeof(codes)/sizeof(codes[0]))]);
+        fout<<log<<'\n';
+    }
+}
